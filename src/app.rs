@@ -31,6 +31,16 @@ pub struct App {
     pub message: Option<String>,
     pub last_funding_time: chrono::DateTime<chrono::Local>,
     pub ticks: u64,
+    pub crosshair_enabled: bool,
+    pub crosshair_col: usize,
+    pub crosshair_info: String,
+    pub chart_focus: ChartFocus,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum ChartFocus {
+    OrderBook,
+    Chart,
 }
 
 #[derive(Clone, Debug)]
@@ -88,13 +98,16 @@ impl App {
             message: Some("Welcome to Terminal Perps! Press '?' for help.".to_string()),
             last_funding_time: chrono::Local::now(),
             ticks: 0,
+            crosshair_enabled: false,
+            crosshair_col: 0,
+            crosshair_info: String::new(),
+            chart_focus: ChartFocus::OrderBook,
         }
     }
 
     pub fn on_tick(&mut self) {
         self.ticks += 1;
 
-        // Live simulation tick for current market
         let market = self.engine.current_market_mut();
         let last_price = market.oracle.price();
         let mut rng = rand::thread_rng();
@@ -102,16 +115,13 @@ impl App {
         market.oracle.set_price(new_price);
         market.chart.tick(new_price, volume);
 
-        // Update 24h stats
         market.stats_24h.update(new_price, volume);
         market.stats_24h.maybe_reset();
 
-        // Simulate orderbook activity (real-time depth)
         let mark = market.oracle.price();
         let book = &mut market.orderbook;
         market.simulator.tick_orderbook(book, &mut rng, mark);
 
-        // Apply funding every ~60 seconds (simulated)
         let now = chrono::Local::now();
         if (now - self.last_funding_time).num_seconds() >= 60 {
             let funding = self.engine.funding.calculate_funding(
@@ -125,13 +135,11 @@ impl App {
             self.message = Some(format!("Funding applied: {:.4}%", funding * Decimal::from(100)));
         }
 
-        // Run liquidator
         let price = self.engine.current_market().oracle.price();
         let maint = self.engine.liquidator.maintenance_margin;
         let orderbook = &mut self.engine.current_market_mut().orderbook;
         crate::engine::liquidator::check_liquidations(maint, &mut self.user, price, orderbook);
 
-        // Save periodically
         if self.ticks % 600 == 0 {
             let _ = persistence::save(self);
         }
@@ -155,10 +163,48 @@ impl App {
     }
 
     async fn handle_normal_input(&mut self, key: KeyEvent) {
+        // Crosshair mode handling first
+        if self.current_screen == Screen::Market && self.crosshair_enabled {
+            match key.code {
+                KeyCode::Left => {
+                    self.crosshair_col = self.crosshair_col.saturating_sub(1);
+                    return;
+                }
+                KeyCode::Right => {
+                    self.crosshair_col = self.crosshair_col.saturating_add(1);
+                    return;
+                }
+                KeyCode::Esc | KeyCode::Char('x') => {
+                    self.crosshair_enabled = false;
+                    self.crosshair_info.clear();
+                    return;
+                }
+                KeyCode::Char('?') => self.current_screen = Screen::Help,
+                KeyCode::Char('1'..='5') => {
+                    self.crosshair_enabled = false;
+                    self.crosshair_info.clear();
+                    match key.code {
+                        KeyCode::Char('1') => self.current_screen = Screen::Market,
+                        KeyCode::Char('2') => self.current_screen = Screen::Trade,
+                        KeyCode::Char('3') => self.current_screen = Screen::Positions,
+                        KeyCode::Char('4') => self.current_screen = Screen::Account,
+                        KeyCode::Char('5') => self.current_screen = Screen::History,
+                        _ => {}
+                    }
+                    return;
+                }
+                _ => return,
+            }
+        }
+
         match key.code {
             KeyCode::Up => {
                 if self.current_screen == Screen::Trade {
                     self.cycle_trade_field(-1);
+                } else if self.current_screen == Screen::Market
+                    && self.chart_focus == ChartFocus::Chart
+                {
+                    // Up in chart mode: nothing for now (could zoom in future)
                 } else {
                     self.selected_row = self.selected_row.saturating_sub(1);
                 }
@@ -166,15 +212,26 @@ impl App {
             KeyCode::Down => {
                 if self.current_screen == Screen::Trade {
                     self.cycle_trade_field(1);
+                } else if self.current_screen == Screen::Market
+                    && self.chart_focus == ChartFocus::Chart
+                {
+                    // Down in chart mode: nothing for now
                 } else {
                     self.selected_row = self.selected_row.saturating_add(1);
                 }
             }
-
-            KeyCode::Char('?') => self.current_screen = Screen::Help,
-            KeyCode::Char(' ') => {
-                if self.current_screen == Screen::Trade {
-                    self.toggle_trade_field();
+            KeyCode::Left => {
+                if self.current_screen == Screen::Market && self.chart_focus == ChartFocus::Chart
+                {
+                    self.crosshair_enabled = true;
+                    self.crosshair_col = self.crosshair_col.saturating_sub(1);
+                }
+            }
+            KeyCode::Right => {
+                if self.current_screen == Screen::Market && self.chart_focus == ChartFocus::Chart
+                {
+                    self.crosshair_enabled = true;
+                    self.crosshair_col = self.crosshair_col.saturating_add(1);
                 }
             }
             KeyCode::Enter => match self.current_screen {
@@ -192,9 +249,36 @@ impl App {
                         _ => self.toggle_trade_field(),
                     }
                 }
-                Screen::Market => self.cancel_selected_order(),
+                Screen::Market => {
+                    if self.chart_focus == ChartFocus::OrderBook {
+                        self.cancel_selected_order();
+                    }
+                }
                 _ => {}
             },
+
+            KeyCode::Tab => {
+                if self.current_screen == Screen::Market {
+                    self.chart_focus = match self.chart_focus {
+                        ChartFocus::OrderBook => ChartFocus::Chart,
+                        ChartFocus::Chart => ChartFocus::OrderBook,
+                    };
+                    self.crosshair_enabled = false;
+                    self.crosshair_info.clear();
+                    let label = match self.chart_focus {
+                        ChartFocus::OrderBook => "Order Book",
+                        ChartFocus::Chart => "Chart",
+                    };
+                    self.message = Some(format!("Focus: {}", label));
+                }
+            }
+
+            KeyCode::Char('?') => self.current_screen = Screen::Help,
+            KeyCode::Char(' ') => {
+                if self.current_screen == Screen::Trade {
+                    self.toggle_trade_field();
+                }
+            }
             KeyCode::Char('s') => {
                 if self.current_screen == Screen::Trade {
                     self.submit_trade();
@@ -205,15 +289,39 @@ impl App {
                     let next = self.engine.current_market().chart.timeframe.next();
                     let market = self.engine.current_market_mut();
                     market.chart.set_timeframe(next);
+                    self.crosshair_enabled = false;
+                    self.crosshair_info.clear();
                     self.message = Some(format!("Timeframe: {}", next.label()));
                 }
             }
             KeyCode::Char('m') => {
                 self.engine.next_market();
                 let sym = self.engine.current_market.clone();
+                self.crosshair_enabled = false;
+                self.crosshair_info.clear();
                 self.message = Some(format!("Market: {}", sym));
             }
+            KeyCode::Char('x') => {
+                if self.current_screen == Screen::Market {
+                    self.crosshair_enabled = !self.crosshair_enabled;
+                    self.chart_focus = ChartFocus::Chart;
+                    if !self.crosshair_enabled {
+                        self.crosshair_info.clear();
+                    }
+                    self.message = Some(if self.crosshair_enabled {
+                        "Crosshair ON | ←→=move | Esc/x=exit".to_string()
+                    } else {
+                        "Crosshair OFF".to_string()
+                    });
+                }
+            }
 
+            KeyCode::Char('c') => {
+                if self.current_screen == Screen::Positions && !self.user.positions.is_empty()
+                {
+                    self.close_position();
+                }
+            }
             KeyCode::Char('d') => {
                 if self.current_screen == Screen::Account {
                     self.input_mode = InputMode::Editing;
@@ -373,17 +481,20 @@ impl App {
             return;
         }
 
+        self.execute_order(self.trade_form.side, OrderType::Market, price, size, leverage as u32);
+    }
+
+    fn execute_order(&mut self, side: OrderSide, order_type: OrderType, price: Decimal, size: Decimal, leverage: u32) {
         let order = Order::new(
             self.user.pubkey.clone(),
-            self.trade_form.side,
-            self.trade_form.order_type,
+            side,
+            order_type,
             price,
             size,
-            leverage as u32,
+            leverage,
         );
 
         let fills = self.engine.submit_order(order);
-
         let mut total_volume = Decimal::ZERO;
         for fill in &fills {
             self.user.apply_fill(fill, self.engine.current_market().oracle.price());
@@ -392,12 +503,37 @@ impl App {
         }
         if total_volume > Decimal::ZERO {
             self.engine.tick_chart(self.engine.current_market().oracle.price(), total_volume);
+            self.engine.current_market_mut().add_fill_marker(price, side);
         }
 
         self.message = Some(format!(
-            "Order submitted: {:?} {} @ {} with {}x leverage on {}",
-            self.trade_form.side, size, price, leverage, self.engine.current_market
+            "Order executed: {:?} {} @ {:.2} {}x on {}",
+            side, size, price, leverage, self.engine.current_market
         ));
+    }
+
+    fn close_position(&mut self) {
+        let positions: Vec<_> = self.user.positions.keys().cloned().collect();
+        if let Some(pk) = positions.get(self.selected_row) {
+            if let Some(pos) = self.user.positions.get(pk) {
+                let close_side = match pos.side {
+                    OrderSide::Buy => OrderSide::Sell,
+                    OrderSide::Sell => OrderSide::Buy,
+                };
+                let price = self.engine.current_market().oracle.price();
+                let size = pos.size;
+                let leverage = pos.leverage;
+
+                self.message = Some(format!("Closing position in {}...", pk));
+                self.execute_order(close_side, OrderType::Market, price, size, leverage);
+            }
+        }
+
+        // Clamp selected_row after potential removal
+        let new_count = self.user.positions.len();
+        if self.selected_row >= new_count && new_count > 0 {
+            self.selected_row = new_count - 1;
+        }
     }
 
     fn cancel_selected_order(&mut self) {

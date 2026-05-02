@@ -179,6 +179,7 @@ impl OrderBook {
         result
     }
 
+    #[allow(dead_code)]
     pub fn remove_order(&mut self, side: OrderSide, price: Decimal, order_id: OrderId) -> Option<Order> {
         let book = match side {
             OrderSide::Buy => &mut self.bids,

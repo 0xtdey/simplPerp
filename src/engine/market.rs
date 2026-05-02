@@ -57,6 +57,14 @@ impl Market24hStats {
     }
 }
 
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+pub struct FillMarker {
+    pub price: Decimal,
+    pub timestamp: chrono::DateTime<chrono::Local>,
+    pub side: OrderSide,
+}
+
 pub struct Market {
     pub symbol: String,
     pub orderbook: OrderBook,
@@ -64,6 +72,7 @@ pub struct Market {
     pub chart: CandleChart,
     pub simulator: MarketSimulator,
     pub recent_trades: Vec<super::RecentTrade>,
+    pub fill_markers: Vec<FillMarker>,
     pub stats_24h: Market24hStats,
 }
 
@@ -76,6 +85,7 @@ impl Market {
             chart: CandleChart::new(200),
             simulator,
             recent_trades: Vec::with_capacity(100),
+            fill_markers: Vec::with_capacity(100),
             stats_24h: Market24hStats::new(Decimal::ZERO),
         }
     }
@@ -183,5 +193,16 @@ impl Market {
         let best_ask = self.orderbook.best_ask()?;
         let best_bid = self.orderbook.best_bid()?;
         Some((best_bid, best_ask, best_ask - best_bid))
+    }
+
+    pub fn add_fill_marker(&mut self, price: Decimal, side: OrderSide) {
+        self.fill_markers.push(FillMarker {
+            price,
+            timestamp: chrono::Local::now(),
+            side,
+        });
+        if self.fill_markers.len() > 100 {
+            self.fill_markers.remove(0);
+        }
     }
 }

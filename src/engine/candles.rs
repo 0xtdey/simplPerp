@@ -82,10 +82,12 @@ impl Candle {
         self.volume += volume;
     }
 
+    #[allow(dead_code)]
     pub fn is_up(&self) -> bool {
         self.close >= self.open
     }
 
+    #[allow(dead_code)]
     pub fn body_size(&self) -> Decimal {
         if self.close >= self.open {
             self.close - self.open
@@ -94,10 +96,12 @@ impl Candle {
         }
     }
 
+    #[allow(dead_code)]
     pub fn wick_high(&self) -> Decimal {
         self.high - if self.close >= self.open { self.close } else { self.open }
     }
 
+    #[allow(dead_code)]
     pub fn wick_low(&self) -> Decimal {
         (if self.close >= self.open { self.open } else { self.close }) - self.low
     }
@@ -163,6 +167,7 @@ impl CandleChart {
         }
     }
 
+    #[allow(dead_code)]
     pub fn compute_ema(&self, period: usize) -> Vec<Decimal> {
         let candles = self.candles();
         if candles.len() < period {
@@ -182,6 +187,7 @@ impl CandleChart {
     }
 }
 
+#[allow(dead_code)]
 pub fn compute_ema(closes: &[Decimal], period: usize) -> Vec<Decimal> {
     if closes.len() < period {
         return Vec::new();

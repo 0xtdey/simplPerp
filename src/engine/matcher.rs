@@ -2,6 +2,7 @@ use super::orderbook::{Order, OrderBook, OrderSide, OrderType};
 use rust_decimal::Decimal;
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct FillEvent {
     pub order_id: u64,
     pub user: String,

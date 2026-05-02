@@ -20,6 +20,7 @@ pub struct Engine {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct RecentTrade {
     pub price: Decimal,
     pub size: Decimal,
@@ -81,6 +82,7 @@ impl Engine {
         self.markets.get(&self.current_market).unwrap()
     }
 
+    #[allow(dead_code)]
     pub fn switch_market(&mut self, symbol: &str) {
         if self.markets.contains_key(symbol) {
             self.current_market = symbol.to_string();

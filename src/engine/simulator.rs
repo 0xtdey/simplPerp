@@ -25,6 +25,7 @@ impl SimulatedCandle {
     }
 }
 
+#[allow(dead_code)]
 pub struct MarketSimulator {
     pub symbol: String,
     pub seed: u64,

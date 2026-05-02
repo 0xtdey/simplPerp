@@ -199,7 +199,7 @@ fn render_orderbook(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(ob, inner);
 }
 
-fn render_market_right(f: &mut Frame, app: &App, area: Rect) {
+fn render_market_right(f: &mut Frame, app: &mut App, area: Rect) {
     let market = app.engine.current_market();
     let stats = &market.stats_24h;
     let mark = market.oracle.price();
@@ -210,22 +210,29 @@ fn render_market_right(f: &mut Frame, app: &App, area: Rect) {
     let candles = market.chart.candles();
     let last_c: Option<&&Candle> = candles.last();
 
-    // Adaptive stats bar height
     let stats_rows: u16 = if area.height < 30 { 2 } else if area.height < 40 { 3 } else { 5 };
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(stats_rows), // stats bar
-            Constraint::Min(5),             // chart
-            Constraint::Length(1),          // recent trades scrollbar
+            Constraint::Length(stats_rows),
+            Constraint::Min(5),
+            Constraint::Length(1),
         ])
         .split(area);
 
     render_stats_bar(f, app, chunks[0], mark, index, funding, spread, change, last_c);
 
-    let ema = market.chart.compute_ema(20);
-    render_candlestick_chart(f, chunks[1], &candles, market.chart.timeframe, &market.symbol, &ema, mark);
+    render_candlestick_chart(
+        f, chunks[1], &candles, market.chart.timeframe, &market.symbol,
+        &market.fill_markers,
+        if app.crosshair_enabled && app.current_screen == crate::app::Screen::Market {
+            Some(app.crosshair_col)
+        } else {
+            None
+        },
+        &mut app.crosshair_info,
+    );
 
     render_recent_trades(f, app, chunks[2]);
 }
