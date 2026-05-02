@@ -2,7 +2,7 @@
 
 A terminal-native perpetual futures DEX simulator. Trade BTC-PERP, ETH-PERP, and SOL-PERP with realistic synthetic market data, a full matching engine, margin system, and live candlestick charts — all from your terminal.
 
-![Demo](demo.png)
+![Terminal Perps screenshot](demo.jpg)
 
 ## What It Is
 
