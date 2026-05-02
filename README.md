@@ -2,11 +2,11 @@
 
 A terminal-native perpetual futures DEX simulator. Trade BTC-PERP, ETH-PERP, and SOL-PERP with realistic synthetic market data, a full matching engine, margin system, and live candlestick charts — all from your terminal.
 
-![Terminal Perps screenshot](demo.jpg)
+![SimplPerp screenshot](demo.jpg)
 
 ## What It Is
 
-Terminal Perps is a standalone TUI (Terminal User Interface) application that simulates a perpetual futures trading environment. It runs entirely locally with no blockchain connection, using a deterministic stochastic price generator to create realistic 30-day market histories for each supported asset.
+SimplPerp is a standalone TUI (Terminal User Interface) application that simulates a perpetual futures trading environment. It runs entirely locally with no blockchain connection, using a deterministic stochastic price generator to create realistic 30-day market histories for each supported asset.
 
 Think of it as a **flight simulator for crypto perp traders** — realistic enough to practice strategies, safe enough that you cannot lose real money.
 
