@@ -1,0 +1,19 @@
+[package]
+name = "terminal-perps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+ratatui = "0.24"
+crossterm = "0.27"
+rust_decimal = { version = "=1.30", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+unicode-width = "0.1"
+bs58 = "0.5"
+rust_decimal_macros = "1.30"
+unicode-segmentation = "=1.11.0"
