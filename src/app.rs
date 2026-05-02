@@ -6,7 +6,6 @@ use crate::engine::{
 use crate::persistence;
 use crate::user::UserAccount;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use rand::Rng;
 use rust_decimal::Decimal;
 use std::path::PathBuf;
 
@@ -103,6 +102,15 @@ impl App {
         market.oracle.set_price(new_price);
         market.chart.tick(new_price, volume);
 
+        // Update 24h stats
+        market.stats_24h.update(new_price, volume);
+        market.stats_24h.maybe_reset();
+
+        // Simulate orderbook activity (real-time depth)
+        let mark = market.oracle.price();
+        let book = &mut market.orderbook;
+        market.simulator.tick_orderbook(book, &mut rng, mark);
+
         // Apply funding every ~60 seconds (simulated)
         let now = chrono::Local::now();
         if (now - self.last_funding_time).num_seconds() >= 60 {
@@ -114,7 +122,7 @@ impl App {
                 .funding
                 .apply_funding(&mut self.user, funding, self.engine.current_market().oracle.price());
             self.last_funding_time = now;
-            self.message = Some(format!("Funding applied: {}", funding));
+            self.message = Some(format!("Funding applied: {:.4}%", funding * Decimal::from(100)));
         }
 
         // Run liquidator

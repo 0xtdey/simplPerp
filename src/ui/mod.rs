@@ -1,7 +1,7 @@
 use crate::app::{App, Screen};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Text},
     widgets::{
         Block, Borders, Clear, Paragraph, Tabs, Wrap,
@@ -9,12 +9,13 @@ use ratatui::{
     Frame,
 };
 
-mod account;
-mod chart;
-mod history;
-mod market;
-mod positions;
-mod trade;
+pub mod account;
+pub mod chart;
+pub mod history;
+pub mod market;
+pub mod positions;
+pub mod theme;
+pub mod trade;
 
 pub fn render(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
@@ -37,10 +38,20 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         .map(|t| Line::from(*t))
         .collect();
     let tabs = Tabs::new(titles)
-        .block(Block::default().borders(Borders::ALL).title("Terminal Perps"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme::BORDER))
+                .title("Terminal Perps"),
+        )
         .select(screen_to_index(app.current_screen))
-        .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .style(Style::default().fg(theme::TEXT_PRIMARY))
+        .highlight_style(
+            Style::default()
+                .fg(theme::AMBER)
+                .bg(theme::SURFACE)
+                .add_modifier(Modifier::BOLD),
+        );
     f.render_widget(tabs, area);
 }
 
@@ -57,15 +68,22 @@ fn render_main(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     let market = app.engine.current_market();
-    let base = format!("{} | 1-5=Screens, m=Market, Up/Down=Navigate, q=Quit, ?=Help", market.symbol);
+    let base = format!(
+        "{} | 1-5=Screens, m=Market, Up/Down=Navigate, q=Quit, ?=Help",
+        market.symbol
+    );
     let text = if let Some(ref msg) = app.message {
         format!("{} | {}", msg, base)
     } else {
         base
     };
     let paragraph = Paragraph::new(text)
-        .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(Color::Cyan));
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme::BORDER)),
+        )
+        .style(Style::default().fg(theme::TEXT_MUTED));
     f.render_widget(paragraph, area);
 }
 
@@ -74,10 +92,11 @@ fn render_popup(f: &mut Frame, app: &App) {
     let block = Block::default()
         .title("Input")
         .borders(Borders::ALL)
-        .style(Style::default().bg(Color::Black));
+        .border_style(Style::default().fg(theme::AMBER))
+        .style(Style::default().bg(theme::BG));
     let input = Paragraph::new(app.input_buffer.as_str())
         .block(block)
-        .style(Style::default().fg(Color::Yellow));
+        .style(Style::default().fg(theme::AMBER));
     f.render_widget(Clear, area);
     f.render_widget(input, area);
 }
@@ -113,7 +132,13 @@ fn render_help(f: &mut Frame, _app: &App, area: Rect) {
         Line::from("  w           - Withdraw"),
     ]);
     let paragraph = Paragraph::new(text)
-        .block(Block::default().borders(Borders::ALL).title("Help"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme::BORDER))
+                .title("Help"),
+        )
+        .style(Style::default().fg(theme::TEXT_PRIMARY))
         .wrap(Wrap { trim: true });
     f.render_widget(paragraph, area);
 }

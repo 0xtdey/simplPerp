@@ -65,7 +65,7 @@ impl Order {
 
 #[derive(Clone, Debug)]
 pub struct OrderBook {
-    bids: BTreeMap<Decimal, Vec<Order>>, // sorted descending by price manually
+    bids: BTreeMap<Decimal, Vec<Order>>,
     asks: BTreeMap<Decimal, Vec<Order>>,
 }
 
@@ -101,12 +101,37 @@ impl OrderBook {
         false
     }
 
+    pub fn cancel_random_order(&mut self, side: OrderSide, price: Decimal) -> bool {
+        let book = match side {
+            OrderSide::Buy => &mut self.bids,
+            OrderSide::Sell => &mut self.asks,
+        };
+        if let Some(orders) = book.get_mut(&price) {
+            if !orders.is_empty() {
+                orders.remove(0);
+                if orders.is_empty() {
+                    book.remove(&price);
+                }
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn best_bid(&self) -> Option<Decimal> {
         self.bids.keys().max().copied()
     }
 
     pub fn best_ask(&self) -> Option<Decimal> {
         self.asks.keys().min().copied()
+    }
+
+    pub fn bid_prices(&self) -> Vec<Decimal> {
+        self.bids.keys().copied().collect()
+    }
+
+    pub fn ask_prices(&self) -> Vec<Decimal> {
+        self.asks.keys().copied().collect()
     }
 
     pub fn l2_snapshot(&self, depth: usize) -> (Vec<(Decimal, Decimal)>, Vec<(Decimal, Decimal)>) {

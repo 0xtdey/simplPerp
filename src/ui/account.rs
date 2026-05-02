@@ -1,28 +1,58 @@
 use crate::app::App;
+use crate::ui::theme;
 use ratatui::{
-    layout::Rect,
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
 pub fn render(f: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default().borders(Borders::ALL).title("Account");
-    let inner = block.inner(area);
-    f.render_widget(block, area);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(8), Constraint::Min(0)])
+        .split(area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::BORDER))
+        .title(" Account ");
+    let inner = block.inner(chunks[0]);
+    f.render_widget(block, chunks[0]);
 
     let text = vec![
-        format!("Pubkey: {}", app.user.pubkey),
-        format!("Total Balance:     {:.2} USDC", app.user.balance),
-        format!("Available Balance: {:.2} USDC", app.user.available_balance),
-        format!("Margin Used:       {:.2} USDC", app.user.balance - app.user.available_balance),
-        "".to_string(),
-        "Keys: d = Deposit, w = Withdraw".to_string(),
+        Line::from(vec![
+            Span::styled("Pubkey: ", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(&app.user.pubkey, Style::default().fg(theme::TEXT_PRIMARY)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Balance:          ", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(
+                format!("{:.2}", app.user.balance),
+                Style::default().fg(theme::TEXT_PRIMARY).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Available:        ", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(
+                format!("{:.2}", app.user.available_balance),
+                Style::default().fg(theme::GREEN),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("Margin Used:      ", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(
+                format!("{:.2}", app.user.balance - app.user.available_balance),
+                Style::default().fg(theme::RED),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("d → Deposit    w → Withdraw", Style::default().fg(theme::TEXT_FAINT)),
+        ]),
     ];
 
-    let paragraph = Paragraph::new(text.join("\n"))
-        .block(Block::default().borders(Borders::NONE))
-        .wrap(Wrap { trim: true })
-        .style(Style::default().fg(Color::White));
-    f.render_widget(paragraph, inner);
+    f.render_widget(Paragraph::new(text), inner);
 }

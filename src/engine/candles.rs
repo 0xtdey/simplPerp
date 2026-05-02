@@ -1,5 +1,6 @@
 use chrono::{DateTime, Local};
 use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -162,6 +163,15 @@ impl CandleChart {
         }
     }
 
+    pub fn compute_ema(&self, period: usize) -> Vec<Decimal> {
+        let candles = self.candles();
+        if candles.len() < period {
+            return Vec::new();
+        }
+        let closes: Vec<Decimal> = candles.iter().map(|c| c.close).collect();
+        compute_ema(&closes, period)
+    }
+
     fn floor_timestamp(dt: DateTime<Local>, tf: Timeframe) -> DateTime<Local> {
         let secs = dt.timestamp();
         let bucket_secs = tf.seconds();
@@ -170,4 +180,32 @@ impl CandleChart {
             .map(|t| t.with_timezone(&Local))
             .unwrap_or(dt)
     }
+}
+
+pub fn compute_ema(closes: &[Decimal], period: usize) -> Vec<Decimal> {
+    if closes.len() < period {
+        return Vec::new();
+    }
+
+    let multiplier = Decimal::from_f64(2.0 / (period as f64 + 1.0)).unwrap_or(Decimal::ONE);
+
+    // First EMA value is SMA of first `period` closes
+    let sma: Decimal = closes[..period].iter().fold(Decimal::ZERO, |a, b| a + *b)
+        / Decimal::from(period);
+
+    let mut ema = Vec::with_capacity(closes.len());
+    // Pad first `period - 1` positions with zero (we won't render these)
+    for _ in 0..period - 1 {
+        ema.push(Decimal::ZERO);
+    }
+    ema.push(sma);
+
+    let mut prev = sma;
+    for close in &closes[period..] {
+        let val = (*close - prev) * multiplier + prev;
+        ema.push(val);
+        prev = val;
+    }
+
+    ema
 }
